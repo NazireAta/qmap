@@ -172,33 +172,48 @@ auto HeuristicPlacer::discretizeNonOccupiedEntanglementSites(
   return std::pair{rowIndices, columnIndices};
 }
 
-auto HeuristicPlacer::makeInitialPlacement(const size_t nQubits) const
+auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits) const
     -> Placement {
-  auto slmIt = architecture_.get().storageZones.cbegin();
-  std::size_t c = 0;
-  std::int64_t r = reverseInitialPlacement_
-                       ? static_cast<std::int64_t>((*slmIt)->nRows) - 1
-                       : 0;
-  const std::int64_t step = reverseInitialPlacement_ ? -1 : 1;
-  Placement initialPlacement;
-  initialPlacement.reserve(nQubits);
-  for (qc::Qubit qubit = 0; qubit < nQubits; ++qubit) {
-    initialPlacement.emplace_back(**slmIt, r, c++);
-    if (c == (*slmIt)->nCols) {
-      // the end of the row reached, go to the next row
-      r += step;
-      c = 0;
-      if (step == 1 ? r == static_cast<std::int64_t>((*slmIt)->nRows)
-                    : r == -1) {
-        // the end of the slm reached, go to the next slm
-        ++slmIt;
-        r = step == 1 ? static_cast<std::int64_t>((*slmIt)->nRows) - 1 : 0;
+  return makeInitialPlacement(nQubits, 0); // Placeholder for the actual implementation of the interaction graph-based initial placement strategy
+}
+auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits) const
+    -> Placement {
+  return makeInitialPlacement(nQubits, 0); // Placeholder for the actual implementation of the zone affinity-based initial placement strategy
+}
+auto HeuristicPlacer::makeInitialPlacement(const size_t nQubits,
+                                           const size_t strategyName) const
+    -> Placement {
+  switch (strategyName) {
+  case 1:
+      return makeInitialPlacementStrategy1(nQubits);
+  case 2:
+      return makeInitialPlacementStrategy2(nQubits);
+  default: // trivial
+    auto slmIt = architecture_.get().storageZones.cbegin();
+    std::size_t c = 0;
+    std::int64_t r = reverseInitialPlacement_
+                        ? static_cast<std::int64_t>((*slmIt)->nRows) - 1
+                        : 0;
+    const std::int64_t step = reverseInitialPlacement_ ? -1 : 1;
+    Placement initialPlacement;
+    initialPlacement.reserve(nQubits);
+    for (qc::Qubit qubit = 0; qubit < nQubits; ++qubit) {
+      initialPlacement.emplace_back(**slmIt, r, c++);
+      if (c == (*slmIt)->nCols) {
+        // the end of the row reached, go to the next row
+        r += step;
+        c = 0;
+        if (step == 1 ? r == static_cast<std::int64_t>((*slmIt)->nRows)
+                      : r == -1) {
+          // the end of the slm reached, go to the next slm
+          ++slmIt;
+          r = step == 1 ? static_cast<std::int64_t>((*slmIt)->nRows) - 1 : 0;
+        }
       }
     }
+    return initialPlacement;
   }
-  return initialPlacement;
 }
-
 auto HeuristicPlacer::makeIntermediatePlacement(
     const Placement& previousPlacement,
     const std::unordered_set<qc::Qubit>& previousReuseQubits,
@@ -1417,7 +1432,7 @@ auto HeuristicPlacer::place(
     -> std::vector<Placement> {
   std::vector<Placement> placement;
   placement.reserve((2 * twoQubitGateLayers.size()) + 1);
-  placement.emplace_back(makeInitialPlacement(nQubits));
+  placement.emplace_back(makeInitialPlacement(nQubits, config_.strategyName));
   for (size_t layer = 0; layer < twoQubitGateLayers.size(); ++layer) {
     const auto& [gatePlacement, qubitPlacement] = makeIntermediatePlacement(
         placement.back(),

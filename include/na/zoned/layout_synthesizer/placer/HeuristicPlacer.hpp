@@ -168,6 +168,12 @@ public:
      * @note This option is only relevant if the IDS heuristic method is used.
      */
     size_t queueCapacity = 100;
+    /**
+     * @brief Selects the initial placement strategy used for the first layer.
+     * @details 0 keeps the trivial placement, 1 selects strategy 1, and 2
+     * selects strategy 2.
+     */
+    size_t strategyName = 0;
 
   private:
     /// @returns the default configuration for the A* method
@@ -185,8 +191,8 @@ public:
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
         Config, useWindow, windowMinWidth, windowRatio, windowShare, method,
-        deepeningFactor, deepeningValue, lookaheadFactor, reuseLevel, maxNodes,
-        trials, queueCapacity);
+      deepeningFactor, deepeningValue, lookaheadFactor, reuseLevel, maxNodes,
+      trials, queueCapacity, strategyName);
   };
 
 private:
@@ -847,7 +853,9 @@ private:
    * @return a list of tuples containing the SLM, row, and column of the atom's
    * initial placement
    */
-  [[nodiscard]] auto makeInitialPlacement(size_t nQubits) const -> Placement;
+  [[nodiscard]] auto makeInitialPlacement(size_t nQubits, size_t strategyName) const -> Placement;
+  [[nodiscard]] auto makeInitialPlacementStrategy1(size_t nQubits) const -> Placement;
+  [[nodiscard]] auto makeInitialPlacementStrategy2(size_t nQubits) const -> Placement;
 
   /**
    * @brief Generates the placements for the next two-qubit and single-qubit

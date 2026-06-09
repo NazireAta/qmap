@@ -127,7 +127,8 @@ Returns:
            const double maxFillingFactor, const bool useWindow,
            const size_t windowSize, const bool dynamicPlacement,
            const na::zoned::IndependentSetRouter::Config::Method routingMethod,
-           const double preferSplit, const bool warnUnsupportedGates) {
+           const double preferSplit, const bool warnUnsupportedGates,
+           const size_t strategyName) {
           na::zoned::RoutingAgnosticCompiler::Config config;
           config.logLevel = spdlog::level::from_str(logLevel);
           config.schedulerConfig.maxFillingFactor = maxFillingFactor;
@@ -139,6 +140,7 @@ Returns:
               .method = routingMethod, .preferSplit = preferSplit};
           config.codeGeneratorConfig = {.warnUnsupportedGates =
                                             warnUnsupportedGates};
+          config.strategyName = strategyName;
           new (self) na::zoned::RoutingAgnosticCompiler{arch, config};
         },
         nb::keep_alive<1, 2>(), "arch"_a,
@@ -156,6 +158,7 @@ Returns:
             defaultConfig.layoutSynthesizerConfig.routerConfig.preferSplit,
         "warn_unsupported_gates"_a =
             defaultConfig.codeGeneratorConfig.warnUnsupportedGates,
+        "strategy_name"_a = defaultConfig.strategyName,
         R"pb(Create a routing-agnostic compiler for the given architecture and configurations.
 
 Args:
@@ -167,7 +170,8 @@ Args:
     dynamic_placement: Whether to use dynamic placement for the placer
     routing_method: The routing method that should be used for the independent set router
     prefer_split: The threshold factor for group merging decisions during routing.
-    warn_unsupported_gates: Whether to warn about unsupported gates in the code generator)pb");
+    warn_unsupported_gates: Whether to warn about unsupported gates in the code generator
+    strategy_name: The name of the initial placement strategy to use, possible values are: 0,1,2)pb");
   }
 
   routingAgnosticCompiler.def_static(
@@ -241,7 +245,8 @@ Returns:
            const size_t maxNodes, const size_t trials,
            const size_t queueCapacity,
            const na::zoned::IndependentSetRouter::Config::Method routingMethod,
-           const double preferSplit, const bool warnUnsupportedGates) {
+           const double preferSplit, const bool warnUnsupportedGates,
+           const size_t strategyName) {
           na::zoned::RoutingAwareCompiler::Config config;
           config.logLevel = spdlog::level::from_str(logLevel);
           config.schedulerConfig.maxFillingFactor = maxFillingFactor;
@@ -258,6 +263,7 @@ Returns:
               .maxNodes = maxNodes,
               .trials = trials,
               .queueCapacity = queueCapacity,
+              .strategyName = strategyName,
           };
           config.layoutSynthesizerConfig.routerConfig = {
               .method = routingMethod, .preferSplit = preferSplit};
@@ -291,6 +297,8 @@ Returns:
         "trials"_a = defaultConfig.layoutSynthesizerConfig.placerConfig.trials,
         "queue_capacity"_a =
             defaultConfig.layoutSynthesizerConfig.placerConfig.queueCapacity,
+        "strategy_name"_a =
+            defaultConfig.layoutSynthesizerConfig.placerConfig.strategyName,
         "routing_method"_a =
             defaultConfig.layoutSynthesizerConfig.routerConfig.method,
         "prefer_split"_a =
@@ -318,6 +326,7 @@ Args:
         Hence, allowing 50,000,000 nodes results in memory consumption of about 6 GB plus the size of the rest of the data structures.
     trials: The number of restarts during IDS.
     queue_capacity: The maximum capacity of the priority queue used during IDS.
+    strategy_name: The initial-placement strategy selector passed to the heuristic placer.
     routing_method: The routing method that should be used for the independent set router
     prefer_split: The threshold factor for group merging decisions during routing.
     warn_unsupported_gates: Whether to warn about unsupported gates in the code generator)pb");

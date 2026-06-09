@@ -91,6 +91,7 @@ class RoutingAgnosticCompiler:
         routing_method: RoutingMethod = ...,
         prefer_split: float = 1.0,
         warn_unsupported_gates: bool = True,
+        strategy_name: int = 0,
     ) -> None:
         """Create a routing-agnostic compiler for the given architecture and configurations.
 
@@ -104,6 +105,7 @@ class RoutingAgnosticCompiler:
             routing_method: The routing method that should be used for the independent set router
             prefer_split: The threshold factor for group merging decisions during routing.
             warn_unsupported_gates: Whether to warn about unsupported gates in the code generator
+            strategy_name: The name of the initial placement strategy to use, possible values are: 0,1,2
         """
 
     @staticmethod
@@ -161,6 +163,7 @@ class RoutingAwareCompiler:
         routing_method: RoutingMethod = ...,
         prefer_split: float = 1.0,
         warn_unsupported_gates: bool = True,
+        strategy_name: int = 0,
     ) -> None:
         """Create a routing-aware compiler for the given architecture and configurations.
 
@@ -186,6 +189,7 @@ class RoutingAwareCompiler:
             routing_method: The routing method that should be used for the independent set router
             prefer_split: The threshold factor for group merging decisions during routing.
             warn_unsupported_gates: Whether to warn about unsupported gates in the code generator
+            strategy_name: The name of the initial placement strategy to use, possible values are: 0,1,2
         """
 
     @staticmethod
