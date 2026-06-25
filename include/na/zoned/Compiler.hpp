@@ -29,6 +29,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <string>
 
 namespace na::zoned {
 #define SELF (*static_cast<ConcreteType*>(this))
@@ -75,6 +76,7 @@ public:
                                                 reuseAnalyzerConfig,
                                                 layoutSynthesizerConfig,
                                                 codeGeneratorConfig, logLevel);
+    std::string strategyName = "default";
   };
 
   /**
