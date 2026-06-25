@@ -10,6 +10,7 @@
 
 #include "na/zoned/layout_synthesizer/placer/HeuristicPlacer.hpp"
 
+#include "../../../../../include/na/zoned/Architecture.hpp"
 #include "ir/Definitions.hpp"
 #include "na/zoned/Architecture.hpp"
 
@@ -174,11 +175,74 @@ auto HeuristicPlacer::discretizeNonOccupiedEntanglementSites(
 
 auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits) const
     -> Placement {
-  return makeInitialPlacement(nQubits, 0); // Placeholder for the actual implementation of the interaction graph-based initial placement strategy
+  auto slmIt = architecture_.get().storageZones.cbegin();
+  size_t rows = 0;
+
+  size_t columns = 0;
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    rows = std::max(rows, slmPtr->nRows);
+    columns = std::max(columns, slmPtr->nCols);
+  }
+
+  size_t midRow = rows / 2;
+  size_t midColumn = columns / 2;
+  std::vector<std::pair<double, Site>> scoredSites;
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    const auto& slm = *slmPtr;
+    for (size_t r = 0; r < slm.nRows; ++r) {
+      for (size_t c = 0; c < slm.nCols; ++c) {
+        double d = std::hypot(static_cast<double>(r) - midRow,
+        static_cast<double>(c) - midColumn);
+        scoredSites.emplace_back(d, Site{slm, r, c});
+      }
+    }
+  }
+  std::sort(scoredSites.begin(), scoredSites.end(),
+    [](const auto& a, auto& b) {return a.first < b.first;});
+  Placement result;
+  result.reserve(nQubits);
+  for (std::size_t i = 0; i < nQubits; ++i) {
+    const auto& [dist, site] = scoredSites[i];
+    const auto& [slmRef, row, col]=site;
+    result.emplace_back(slmRef, row, col);
+  }
+  return result; // Placeholder for the actual implementation of the interaction graph-based initial placement strategy
 }
 auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits) const
     -> Placement {
-  return makeInitialPlacement(nQubits, 0); // Placeholder for the actual implementation of the zone affinity-based initial placement strategy
+  std::vector<std::pair<double, Site>> scoredSites;
+
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    const auto& site = *slmPtr;
+    for (size_t r = 0; r < site.nRows; ++r) {
+      for (size_t c = 0; c < site.nCols; ++c) {
+
+        auto [x,y]  = architecture_.get().exactSLMLocation(site, r, c);
+       // double dist = architecture_.get().distance(slm, r, c, site);
+        double mindist = std::numeric_limits<double>::max();
+        for (const auto& ezPtr: architecture_.get().entanglementZones) {
+          const auto& ez = (*ezPtr)[0];
+          auto [ezX, ezY] = ez.location;
+          double d = std::hypot(static_cast<double>(x) -ezX, static_cast<double>(y) -ezY);
+          mindist = std::min(mindist, d);
+        }
+        scoredSites.emplace_back(mindist, Site{ site, r, c });
+      }
+    }
+  }
+  std::sort(scoredSites.begin(), scoredSites.end(), [](const auto& a, const auto& b) {
+    return a.first < b.first;
+  });
+
+  Placement result;
+  result.reserve(nQubits);
+  for (std::size_t r = 0; r < nQubits; ++r) {
+    const auto& [dist, site] = scoredSites[r];
+    const auto& [slmRef, i, c] = site;
+    result.emplace_back(slmRef.get(), i, c);
+  }
+
+  return result; // Placeholder for the actual implementation of the zone affinity-based initial placement strategy
 }
 auto HeuristicPlacer::makeInitialPlacement(const size_t nQubits,
                                            const size_t strategyName) const
