@@ -29,11 +29,12 @@ public:
    * @param nQubits denotes the number of qubits to be placed
    * @param twoQubitGateLayers are the qubits that must be placed for each layer
    * @param reuseQubits are the qubits that are reused in the next stage
+   * @param strategyName is the name of the placement strategy to use
    */
   [[nodiscard]] virtual auto
   place(size_t nQubits,
         const std::vector<TwoQubitGateLayer>& twoQubitGateLayers,
-        const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits)
+        const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits) const
       -> std::vector<Placement> = 0;
 };
 } // namespace na::zoned

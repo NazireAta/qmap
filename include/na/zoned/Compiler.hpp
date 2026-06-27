@@ -76,7 +76,6 @@ public:
                                                 reuseAnalyzerConfig,
                                                 layoutSynthesizerConfig,
                                                 codeGeneratorConfig, logLevel);
-    std::string strategyName = "default";
   };
 
   /**

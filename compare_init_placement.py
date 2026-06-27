@@ -20,6 +20,7 @@ script can optionally write that output to disk for inspection.
 from __future__ import annotations
 
 import argparse
+from copy import error
 from pathlib import Path
 from typing import Iterable
 import json
@@ -67,17 +68,22 @@ def make_compiler(
     architecture: ZonedNeutralAtomArchitecture, strategy_name: int
 ) -> RoutingAwareCompiler:
     config_dict = {
-        "strategyName": strategy_name,
-        "warn_unsupported_gates": False,
-        "use_window": True
+        "layoutSynthesizerConfig": {
+            "placerConfig": {
+                "strategyName": strategy_name,  # <-- Nests perfectly into HeuristicPlacer::Config!
+                "useWindow": True,
+            }
+        },
+        "logLevel": 4  # 4 = Error level integer
     }
 
-    return RoutingAwareCompiler.from_json_string(architecture, json.dumps(config_dict))
-
+    return RoutingAwareCompiler.from_json_string(
+        architecture, json.dumps(config_dict)
+    )
 
 def benchmark_specs() -> Iterable[tuple[str, int]]:
     families = ("qft", "graphstate", "ghz", "bv", "wstate", "qpeexact")
-    sizes = (20, 50, 100)
+    sizes = (20, 50, 100) # check sizes
     for family in families:
         for size in sizes:
             yield family, size

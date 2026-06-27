@@ -345,8 +345,7 @@ public:
   [[nodiscard]] auto
   place(size_t nQubits,
         const std::vector<TwoQubitGateLayer>& twoQubitGateLayers,
-        const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits)
-      -> std::vector<Placement> override;
+        const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits) const -> std::vector<Placement> override;
 
 private:
   /**
@@ -853,9 +852,9 @@ private:
    * @return a list of tuples containing the SLM, row, and column of the atom's
    * initial placement
    */
-  [[nodiscard]] auto makeInitialPlacement(size_t nQubits, size_t strategyName) const -> Placement;
-  [[nodiscard]] auto makeInitialPlacementStrategy1(size_t nQubits) const -> Placement;
-  [[nodiscard]] auto makeInitialPlacementStrategy2(size_t nQubits) const -> Placement;
+  [[nodiscard]] auto makeInitialPlacement(const size_t nQubits,const size_t strategyName,const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
+  [[nodiscard]] auto makeInitialPlacementStrategy1(size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
+  [[nodiscard]] auto makeInitialPlacementStrategy2(size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
 
   /**
    * @brief Generates the placements for the next two-qubit and single-qubit
@@ -888,7 +887,7 @@ private:
       const std::unordered_set<qc::Qubit>& previousReuseQubits,
       const std::unordered_set<qc::Qubit>& reuseQubits,
       const TwoQubitGateLayer& twoQubitGates,
-      const TwoQubitGateLayer& nextTwoQubitGates)
+      const TwoQubitGateLayer& nextTwoQubitGates) const
       -> std::pair<Placement, Placement>;
 
   /**
@@ -917,7 +916,7 @@ private:
       const std::unordered_set<qc::Qubit>& reuseQubits,
       const TwoQubitGateLayer& twoQubitGates,
       const std::unordered_set<qc::Qubit>& nextReuseQubits,
-      const TwoQubitGateLayer& nextTwoQubitGates) -> Placement;
+      const TwoQubitGateLayer& nextTwoQubitGates) const -> Placement;
 
   /**
    * @brief This function places qubits from the entanglement zone in the
@@ -937,7 +936,7 @@ private:
   auto placeAtomsInStorageZone(const Placement& previousPlacement,
                                const std::unordered_set<qc::Qubit>& reuseQubits,
                                const TwoQubitGateLayer& twoQubitGates,
-                               const TwoQubitGateLayer& nextTwoQubitGates)
+                               const TwoQubitGateLayer& nextTwoQubitGates) const
       -> Placement;
 
   /**

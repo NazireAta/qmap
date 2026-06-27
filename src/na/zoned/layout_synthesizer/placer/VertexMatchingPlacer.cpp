@@ -690,11 +690,11 @@ VertexMatchingPlacer::VertexMatchingPlacer(const Architecture& architecture,
 auto VertexMatchingPlacer::place(
     const size_t nQubits,
     const std::vector<TwoQubitGateLayer>& twoQubitGateLayers,
-    const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits)
+    const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits) const
     -> std::vector<Placement> {
   std::vector<Placement> placement;
   placement.reserve((2 * twoQubitGateLayers.size()) + 1);
-  placement.emplace_back(makeInitialPlacement(nQubits));
+  placement.emplace_back(makeInitialPlacement(nQubits, 0, twoQubitGateLayers));
   // early return if no two-qubit gates are present
   if (twoQubitGateLayers.empty()) {
     return placement;
@@ -768,7 +768,9 @@ auto VertexMatchingPlacer::place(
   }
   return placement;
 }
-auto VertexMatchingPlacer::makeInitialPlacement(const size_t nQubits) const
+auto VertexMatchingPlacer::makeInitialPlacement(const size_t nQubits,
+                                               const size_t strategyName,
+                                               const std::vector<TwoQubitGateLayer>& schedule) const
     -> Placement {
   auto slmIt = architecture_.get().storageZones.cbegin();
   std::size_t c = 0;

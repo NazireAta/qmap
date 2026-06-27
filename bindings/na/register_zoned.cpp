@@ -127,8 +127,7 @@ Returns:
            const double maxFillingFactor, const bool useWindow,
            const size_t windowSize, const bool dynamicPlacement,
            const na::zoned::IndependentSetRouter::Config::Method routingMethod,
-           const double preferSplit, const bool warnUnsupportedGates,
-           const size_t strategyName) {
+           const double preferSplit, const bool warnUnsupportedGates) {
           na::zoned::RoutingAgnosticCompiler::Config config;
           config.logLevel = spdlog::level::from_str(logLevel);
           config.schedulerConfig.maxFillingFactor = maxFillingFactor;
@@ -140,7 +139,6 @@ Returns:
               .method = routingMethod, .preferSplit = preferSplit};
           config.codeGeneratorConfig = {.warnUnsupportedGates =
                                             warnUnsupportedGates};
-          config.strategyName = strategyName;
           new (self) na::zoned::RoutingAgnosticCompiler{arch, config};
         },
         nb::keep_alive<1, 2>(), "arch"_a,
@@ -158,7 +156,6 @@ Returns:
             defaultConfig.layoutSynthesizerConfig.routerConfig.preferSplit,
         "warn_unsupported_gates"_a =
             defaultConfig.codeGeneratorConfig.warnUnsupportedGates,
-        "strategy_name"_a = defaultConfig.strategyName,
         R"pb(Create a routing-agnostic compiler for the given architecture and configurations.
 
 Args:
@@ -297,14 +294,14 @@ Returns:
         "trials"_a = defaultConfig.layoutSynthesizerConfig.placerConfig.trials,
         "queue_capacity"_a =
             defaultConfig.layoutSynthesizerConfig.placerConfig.queueCapacity,
-        "strategy_name"_a =
-            defaultConfig.layoutSynthesizerConfig.placerConfig.strategyName,
         "routing_method"_a =
             defaultConfig.layoutSynthesizerConfig.routerConfig.method,
         "prefer_split"_a =
             defaultConfig.layoutSynthesizerConfig.routerConfig.preferSplit,
         "warn_unsupported_gates"_a =
             defaultConfig.codeGeneratorConfig.warnUnsupportedGates,
+        "strategy_name"_a =
+            defaultConfig.layoutSynthesizerConfig.placerConfig.strategyName,
         R"pb(Create a routing-aware compiler for the given architecture and configurations.
 
 Args:

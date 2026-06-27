@@ -98,12 +98,12 @@ public:
   [[nodiscard]] auto
   place(size_t nQubits,
         const std::vector<TwoQubitGateLayer>& twoQubitGateLayers,
-        const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits)
+        const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits) const
       -> std::vector<Placement> override;
 
 private:
   /// Generate qubit initial layout
-  auto makeInitialPlacement(size_t nQubits) const -> Placement;
+  auto makeInitialPlacement(size_t nQubits, size_t strategyName, const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
 
   /**
    * @note implemented following pseudocode in

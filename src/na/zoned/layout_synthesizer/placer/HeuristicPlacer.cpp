@@ -173,7 +173,7 @@ auto HeuristicPlacer::discretizeNonOccupiedEntanglementSites(
   return std::pair{rowIndices, columnIndices};
 }
 
-auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits) const
+auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const
     -> Placement {
   auto slmIt = architecture_.get().storageZones.cbegin();
   size_t rows = 0;
@@ -208,10 +208,19 @@ auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits) const
   }
   return result; // Placeholder for the actual implementation of the interaction graph-based initial placement strategy
 }
-auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits) const
+auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const
     -> Placement {
   std::vector<std::pair<double, Site>> scoredSites;
+  SPDLOG_ERROR("--- INSPECTING LOOKAHEAD SCHEDULE GRAPH --- Total Layers scheduled: {}", schedule.size());
 
+  for (size_t layerIdx = 0; layerIdx < schedule.size(); ++layerIdx) {
+    const auto& layer = schedule[layerIdx];
+    SPDLOG_ERROR("  Layer #{} has {} interaction(s):", layerIdx, layer.size());
+    
+    for (const auto& gate : layer) {
+      SPDLOG_ERROR("    [Qubit {} <--> Qubit {}]", gate[0], gate[1]);
+    }
+  }
   for (const auto& slmPtr : architecture_.get().storageZones) {
     const auto& site = *slmPtr;
     for (size_t r = 0; r < site.nRows; ++r) {
@@ -245,13 +254,15 @@ auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits) const
   return result; // Placeholder for the actual implementation of the zone affinity-based initial placement strategy
 }
 auto HeuristicPlacer::makeInitialPlacement(const size_t nQubits,
-                                           const size_t strategyName) const
+                                           const size_t strategyName,
+                                           const std::vector<TwoQubitGateLayer>& schedule) const
     -> Placement {
+  SPDLOG_ERROR("--- INSPECTING INITIAL PLACEMENT STRATEGY --- Strategy Name: {}", strategyName);
   switch (strategyName) {
   case 1:
-      return makeInitialPlacementStrategy1(nQubits);
+      return makeInitialPlacementStrategy1(nQubits, schedule);
   case 2:
-      return makeInitialPlacementStrategy2(nQubits);
+      return makeInitialPlacementStrategy2(nQubits, schedule);
   default: // trivial
     auto slmIt = architecture_.get().storageZones.cbegin();
     std::size_t c = 0;
@@ -283,7 +294,7 @@ auto HeuristicPlacer::makeIntermediatePlacement(
     const std::unordered_set<qc::Qubit>& previousReuseQubits,
     const std::unordered_set<qc::Qubit>& reuseQubits,
     const TwoQubitGateLayer& twoQubitGates,
-    const TwoQubitGateLayer& nextTwoQubitGates)
+    const TwoQubitGateLayer& nextTwoQubitGates) const
     -> std::pair<Placement, Placement> {
   const auto& gatePlacement = placeGatesInEntanglementZone(
       previousPlacement, previousReuseQubits, twoQubitGates, reuseQubits,
@@ -352,7 +363,7 @@ auto HeuristicPlacer::placeGatesInEntanglementZone(
     const std::unordered_set<qc::Qubit>& reuseQubits,
     const TwoQubitGateLayer& twoQubitGates,
     const std::unordered_set<qc::Qubit>& nextReuseQubits,
-    const TwoQubitGateLayer& nextTwoQubitGates) -> Placement {
+    const TwoQubitGateLayer& nextTwoQubitGates) const -> Placement {
   // Duplicate the previous placement as a starting point for the current
   auto currentPlacement = previousPlacement;
   //===------------------------------------------------------------------===//
@@ -747,7 +758,7 @@ auto HeuristicPlacer::placeAtomsInStorageZone(
     const Placement& previousPlacement,
     const std::unordered_set<qc::Qubit>& reuseQubits,
     const TwoQubitGateLayer& twoQubitGates,
-    const TwoQubitGateLayer& nextTwoQubitGates) -> Placement {
+    const TwoQubitGateLayer& nextTwoQubitGates) const -> Placement {
   // Duplicate the previous placement as a starting point for the current
   auto currentPlacement = previousPlacement;
   if (twoQubitGates.empty()) {
@@ -1492,11 +1503,11 @@ HeuristicPlacer::HeuristicPlacer(const Architecture& architecture,
 auto HeuristicPlacer::place(
     const size_t nQubits,
     const std::vector<TwoQubitGateLayer>& twoQubitGateLayers,
-    const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits)
+    const std::vector<std::unordered_set<qc::Qubit>>& reuseQubits) const
     -> std::vector<Placement> {
   std::vector<Placement> placement;
   placement.reserve((2 * twoQubitGateLayers.size()) + 1);
-  placement.emplace_back(makeInitialPlacement(nQubits, config_.strategyName));
+  placement.emplace_back(makeInitialPlacement(nQubits, config_.strategyName, twoQubitGateLayers));
   for (size_t layer = 0; layer < twoQubitGateLayers.size(); ++layer) {
     const auto& [gatePlacement, qubitPlacement] = makeIntermediatePlacement(
         placement.back(),
