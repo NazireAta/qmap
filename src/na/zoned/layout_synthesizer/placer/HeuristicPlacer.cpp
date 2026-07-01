@@ -172,7 +172,7 @@ auto HeuristicPlacer::discretizeNonOccupiedEntanglementSites(
   }
   return std::pair{rowIndices, columnIndices};
 }
-
+/*
 auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const
     -> Placement {
   auto slmIt = architecture_.get().storageZones.cbegin();
@@ -252,6 +252,138 @@ auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits, const 
   }
 
   return result; // Placeholder for the actual implementation of the zone affinity-based initial placement strategy
+}
+*/
+auto HeuristicPlacer::makeInitialPlacementStrategy1(
+    const size_t nQubits,
+    const std::vector<TwoQubitGateLayer>& schedule) const -> Placement {
+
+  std::vector<std::pair<size_t, qc::Qubit>> qubitActivity;
+  qubitActivity.reserve(nQubits);
+  for (qc::Qubit q = 0; q < nQubits; ++q) {
+    qubitActivity.emplace_back(0, q);
+  }
+  for (const auto& layer : schedule) {
+    for (const auto& gate : layer) {
+      if (gate[0] < nQubits) qubitActivity[gate[0]].first++;
+      if (gate[1] < nQubits) qubitActivity[gate[1]].first++;
+    }
+  }
+
+  std::sort(qubitActivity.begin(), qubitActivity.end(),
+            [](const auto& a, const auto& b) { return a.first > b.first; });
+
+  size_t rows = 0;
+  size_t columns = 0;
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    rows = std::max(rows, slmPtr->nRows);
+    columns = std::max(columns, slmPtr->nCols);
+  }
+  size_t midRow = rows / 2;
+  size_t midColumn = columns / 2;
+
+  std::vector<std::pair<double, Site>> scoredSites;
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    const auto& slm = *slmPtr;
+    for (size_t r = 0; r < slm.nRows; ++r) {
+      for (size_t c = 0; c < slm.nCols; ++c) {
+        double d = std::hypot(static_cast<double>(r) - midRow,
+                              static_cast<double>(c) - midColumn);
+        scoredSites.emplace_back(d, Site{slm, r, c});
+      }
+    }
+  }
+  std::sort(scoredSites.begin(), scoredSites.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+
+  Placement result(nQubits, scoredSites[0].second);
+
+  for (size_t i = 0; i < nQubits; ++i) {
+    if (i >= scoredSites.size()) break;
+    qc::Qubit activeQubit = qubitActivity[i].second;
+    const auto& [dist, site] = scoredSites[i];
+    const auto& [slmRef, r, c] = site;
+    result[activeQubit] = {slmRef, r, c};
+  }
+  return result;
+}
+
+auto HeuristicPlacer::makeInitialPlacementStrategy2(
+    const size_t nQubits,
+    const std::vector<TwoQubitGateLayer>& schedule) const -> Placement {
+
+  std::vector<std::unordered_set<qc::Qubit>> adj(nQubits);
+  std::vector<std::pair<size_t, qc::Qubit>> degrees;
+  degrees.reserve(nQubits);
+  for (qc::Qubit q = 0; q < nQubits; ++q) degrees.emplace_back(0, q);
+
+  for (const auto& layer : schedule) {
+    for (const auto& gate : layer) {
+      if (gate[0] < nQubits && gate[1] < nQubits) {
+        if (adj[gate[0]].insert(gate[1]).second) {
+          degrees[gate[0]].first++;
+          degrees[gate[1]].first++;
+          adj[gate[1]].insert(gate[0]);
+        }
+      }
+    }
+  }
+
+  std::sort(degrees.begin(), degrees.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+
+  size_t rows = 0; size_t columns = 0;
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    rows = std::max(rows, slmPtr->nRows); columns = std::max(columns, slmPtr->nCols);
+  }
+  size_t midRow = rows / 2; size_t midColumn = columns / 2;
+  std::vector<std::pair<double, Site>> scoredSites;
+  for (const auto& slmPtr : architecture_.get().storageZones) {
+    const auto& slm = *slmPtr;
+    for (size_t r = 0; r < slm.nRows; ++r) {
+      for (size_t c = 0; c < slm.nCols; ++c) {
+        double d = std::hypot(static_cast<double>(r) - midRow, static_cast<double>(c) - midColumn);
+        scoredSites.emplace_back(d, Site{slm, r, c});
+      }
+    }
+  }
+  std::sort(scoredSites.begin(), scoredSites.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+
+  std::vector<qc::Qubit> placementOrder;
+  placementOrder.reserve(nQubits);
+  std::vector<bool> visited(nQubits, false);
+
+  for (const auto& [deg, startQubit] : degrees) {
+    if (visited[startQubit]) continue;
+
+    std::queue<qc::Qubit> q;
+    q.push(startQubit);
+    visited[startQubit] = true;
+
+    while (!q.empty()) {
+      qc::Qubit curr = q.front();
+      q.pop();
+      placementOrder.push_back(curr);
+
+      for (qc::Qubit neighbor : adj[curr]) {
+        if (!visited[neighbor]) {
+          visited[neighbor] = true;
+          q.push(neighbor);
+        }
+      }
+    }
+  }
+
+  Placement result(nQubits, scoredSites[0].second);
+
+  for (size_t i = 0; i < nQubits; ++i) {
+    if (i >= scoredSites.size()) break;
+    qc::Qubit q = placementOrder[i];
+    const auto& [dist, site] = scoredSites[i];
+    const auto& [slmRef, r, c] = site;
+    result[q] = {slmRef, r, c};
+  }
+
+  return result;
 }
 auto HeuristicPlacer::makeInitialPlacement(const size_t nQubits,
                                            const size_t strategyName,
