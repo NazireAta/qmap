@@ -10,8 +10,8 @@ The script mirrors the zoned compiler example from the documentation:
 The current dummy placer is controlled through the ``strategy_name`` selector:
 
 * ``0`` -> trivial initial placement
-* ``1`` -> strategy 1
-* ``2`` -> strategy 2
+* ``1`` -> activity / zone-affinity placement
+* ``2`` -> interaction-graph placement
 
 The compiler produces the same ``.naviz`` output shown in the docs, and the
 script can optionally write that output to disk for inspection.
@@ -20,10 +20,9 @@ script can optionally write that output to disk for inspection.
 from __future__ import annotations
 
 import argparse
-from copy import error
+import json
 from pathlib import Path
 from typing import Iterable
-import json
 import time
 from qiskit import QuantumCircuit, transpile
 
@@ -58,6 +57,7 @@ DEFAULT_ARCHITECTURE_JSON = """{
 }"""
 
 STRATEGIES = (0, 1, 2)
+TRANSPILER_SEED = 0
 
 
 def make_architecture(architecture_json: str) -> ZonedNeutralAtomArchitecture:
@@ -67,14 +67,15 @@ def make_architecture(architecture_json: str) -> ZonedNeutralAtomArchitecture:
 def make_compiler(
     architecture: ZonedNeutralAtomArchitecture, strategy_name: int
 ) -> RoutingAwareCompiler:
-    config_dict = {
+    config_dict: dict[str, object] = {
         "layoutSynthesizerConfig": {
             "placerConfig": {
-                "strategyName": strategy_name,  # <-- Nests perfectly into HeuristicPlacer::Config!
+                "strategyName": strategy_name,
                 "useWindow": True,
             }
         },
-        "logLevel": 4  # 4 = Error level integer
+        "logLevel": 4,  # Error
+        "trials": 1,
     }
 
     return RoutingAwareCompiler.from_json_string(
@@ -82,8 +83,8 @@ def make_compiler(
     )
 
 def benchmark_specs() -> Iterable[tuple[str, int]]:
-    families = ("qft", "graphstate", "ghz", "bv", "wstate", "qpeexact")
-    sizes = (20, 50, 100) # check sizes
+    families = ("qft", "qaoa", "ghz", "bv", "wstate", "qpeexact") #qaoa - graphstate
+    sizes = (20, 50, 100)
     for family in families:
         for size in sizes:
             yield family, size
@@ -93,55 +94,78 @@ def compile_one(
     benchmark_name: str,
     size: int,
     strategy_name: int,
+    repetition: int,
     architecture: ZonedNeutralAtomArchitecture,
     naviz_dir: Path | None,
 ) -> dict[str, object]:
-    print(f"Compiling {benchmark_name} with n={size} and strategy {strategy_name}...")
+    print(
+        f"Compiling {benchmark_name} with n={size}, strategy "
+        f"{strategy_name}, repetition {repetition}..."
+    )
     raw_circuit = get_benchmark(benchmark_name, BenchmarkLevel.ALG, size)
     transpiled_circuit = transpile(
-        raw_circuit, 
-        basis_gates=["cz", "id", "u2", "u1", "u3"], 
-        optimization_level=1
+        raw_circuit,
+        basis_gates=["cz", "id", "u2", "u1", "u3"],
+        optimization_level=1,
+        seed_transpiler=TRANSPILER_SEED,
     )
 
-    stripped_circuit = QuantumCircuit(*transpiled_circuit.qregs, *transpiled_circuit.cregs)
+    stripped_circuit = QuantumCircuit(
+        *transpiled_circuit.qregs, *transpiled_circuit.cregs
+    )
     for instruction in transpiled_circuit.data:
         if instruction.operation.name not in {"measure", "barrier"}:
             stripped_circuit.append(instruction)
     compiler = make_compiler(architecture, strategy_name)
-    print(type(compiler))
-    # Track execution time manually in case C++ bindings stay stateless
+    # Compiler statistics are reported in microseconds. Retain a wall-clock
+    # fallback in the same unit for bindings that do not expose statistics.
     start_wall = time.perf_counter()
     compiled = compiler.compile(load(stripped_circuit))
     end_wall = time.perf_counter()
-    
     stats = compiler.stats()
-    
-    # If stats comes back empty from the C++ layer, inject our manual benchmark timings
     if not stats:
         print("No stats from compiler, using manual timing.")
         stats = {
-            "totalTime": (end_wall - start_wall) * 1000, # time in ms for your pandas mean() aggregation
+            "totalTime": (end_wall - start_wall) * 1_000_000,
         }
 
     if naviz_dir is not None:
         naviz_dir.mkdir(parents=True, exist_ok=True)
-        naviz_path = naviz_dir / f"{benchmark_name}_n{size}_strategy{strategy_name}.naviz"
+        naviz_path = (
+            naviz_dir
+            / f"{benchmark_name}_n{size}_strategy{strategy_name}_run{repetition}.naviz"
+        )
         naviz_path.write_text(compiled)
 
     row: dict[str, object] = {
         "benchmark": benchmark_name,
         "n_qubits": size,
         "strategy_name": strategy_name,
+        "repetition": repetition,
         "naviz_length": len(compiled),
     }
     row.update(stats)
+
+    if "layoutSynthesizerStatistics" in stats:
+        print("Compiler reported layout synthesizer statistics.")
+        inner = stats["layoutSynthesizerStatistics"]
+        if isinstance(inner, str):
+            inner = json.loads(inner)  # or ast.literal_eval if it's a Python dict repr
+        for k, v in inner.items():
+            row[f"lss_{k}"] = v
+
     return row
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="placement_comparison.csv", help="CSV output path")
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=7,
+        help="Number of independent compiler runs per benchmark and strategy",
+    )
     parser.add_argument(
         "--naviz-dir",
         default=None,
@@ -153,6 +177,8 @@ def main() -> int:
         help="Optional architecture JSON string or path to a JSON file",
     )
     args = parser.parse_args()
+    if args.repetitions < 1:
+        parser.error("--repetitions must be at least one")
 
     arch_json_arg = args.arch_json.strip()
     if arch_json_arg.startswith("{") or arch_json_arg.startswith("["):
@@ -166,23 +192,36 @@ def main() -> int:
     rows = []
     for benchmark_name, size in benchmark_specs():
         for strategy_name in STRATEGIES:
-            #try:
-            row = compile_one(benchmark_name, size, strategy_name, architecture, naviz_dir)
-            #except Exception as exc:  # pragma: no cover - surfaced in the CSV output
-            #    row = {
-            #        "benchmark": benchmark_name,
-            #        "n_qubits": size,
-            #        "strategy_name": strategy_name,
-            #        "error": repr(exc),
-            #    }
-            rows.append(row)
+            for repetition in range(args.repetitions):
+                try:
+                    row = compile_one(
+                        benchmark_name,
+                        size,
+                        strategy_name,
+                        repetition,
+                        architecture,
+                        naviz_dir,
+                    )
+                except Exception as exc:  # pragma: no cover - recorded for analysis
+                    row = {
+                        "benchmark": benchmark_name,
+                        "n_qubits": size,
+                        "strategy_name": strategy_name,
+                        "repetition": repetition,
+                        "error": repr(exc),
+                    }
+                rows.append(row)
 
     df = pd.DataFrame(rows)
     df.to_csv(args.out, index=False)
 
     try:
-        agg = df.groupby(["benchmark", "strategy_name"])["totalTime"].mean()
-        print(agg.to_string())
+        summary = (
+            df.groupby(["benchmark", "n_qubits", "strategy_name"])["totalTime"]
+            .agg(["median", "mean", "std"])
+            .rename(columns={"median": "median_compile_time_us"})
+        )
+        print(summary.to_string())
     except Exception:
         print("No aggregation available (missing totalTime values)")
     return 0
@@ -190,3 +229,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+    #compile_one( benchmark_name="qft", size=20, strategy_name=0, repetition=0, architecture=make_architecture(DEFAULT_ARCHITECTURE_JSON), naviz_dir=None,)
