@@ -56,7 +56,7 @@ DEFAULT_ARCHITECTURE_JSON = """{
   "rydberg_range": [[[30, 62], [270, 132]]]
 }"""
 
-STRATEGIES = (0, 1, 2)
+STRATEGIES = (0, 1, 2, 3)
 TRANSPILER_SEED = 0
 
 

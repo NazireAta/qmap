@@ -855,7 +855,7 @@ private:
   [[nodiscard]] auto makeInitialPlacement(const size_t nQubits,const size_t strategyName,const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
   [[nodiscard]] auto makeInitialPlacementStrategy1(size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
   [[nodiscard]] auto makeInitialPlacementStrategy2(size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
-
+  [[nodiscard]] auto makeInitialPlacementStrategy3(size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const -> Placement;
   /**
    * @brief Generates the placements for the next two-qubit and single-qubit
    * layers.

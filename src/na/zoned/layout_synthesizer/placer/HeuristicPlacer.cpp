@@ -172,7 +172,7 @@ auto HeuristicPlacer::discretizeNonOccupiedEntanglementSites(
   }
   return std::pair{rowIndices, columnIndices};
 }
-/*
+
 auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const
     -> Placement {
   auto slmIt = architecture_.get().storageZones.cbegin();
@@ -208,53 +208,8 @@ auto HeuristicPlacer::makeInitialPlacementStrategy1(const size_t nQubits, const 
   }
   return result; // Placeholder for the actual implementation of the interaction graph-based initial placement strategy
 }
-auto HeuristicPlacer::makeInitialPlacementStrategy2(const size_t nQubits, const std::vector<TwoQubitGateLayer>& schedule) const
-    -> Placement {
-  std::vector<std::pair<double, Site>> scoredSites;
-  SPDLOG_ERROR("--- INSPECTING LOOKAHEAD SCHEDULE GRAPH --- Total Layers scheduled: {}", schedule.size());
 
-  for (size_t layerIdx = 0; layerIdx < schedule.size(); ++layerIdx) {
-    const auto& layer = schedule[layerIdx];
-    SPDLOG_ERROR("  Layer #{} has {} interaction(s):", layerIdx, layer.size());
-    
-    for (const auto& gate : layer) {
-      SPDLOG_ERROR("    [Qubit {} <--> Qubit {}]", gate[0], gate[1]);
-    }
-  }
-  for (const auto& slmPtr : architecture_.get().storageZones) {
-    const auto& site = *slmPtr;
-    for (size_t r = 0; r < site.nRows; ++r) {
-      for (size_t c = 0; c < site.nCols; ++c) {
-
-        auto [x,y]  = architecture_.get().exactSLMLocation(site, r, c);
-       // double dist = architecture_.get().distance(slm, r, c, site);
-        double mindist = std::numeric_limits<double>::max();
-        for (const auto& ezPtr: architecture_.get().entanglementZones) {
-          const auto& ez = (*ezPtr)[0];
-          auto [ezX, ezY] = ez.location;
-          double d = std::hypot(static_cast<double>(x) -ezX, static_cast<double>(y) -ezY);
-          mindist = std::min(mindist, d);
-        }
-        scoredSites.emplace_back(mindist, Site{ site, r, c });
-      }
-    }
-  }
-  std::sort(scoredSites.begin(), scoredSites.end(), [](const auto& a, const auto& b) {
-    return a.first < b.first;
-  });
-
-  Placement result;
-  result.reserve(nQubits);
-  for (std::size_t r = 0; r < nQubits; ++r) {
-    const auto& [dist, site] = scoredSites[r];
-    const auto& [slmRef, i, c] = site;
-    result.emplace_back(slmRef.get(), i, c);
-  }
-
-  return result; // Placeholder for the actual implementation of the zone affinity-based initial placement strategy
-}
-*/
-auto HeuristicPlacer::makeInitialPlacementStrategy1(
+auto HeuristicPlacer::makeInitialPlacementStrategy2(
     const size_t nQubits,
     const std::vector<TwoQubitGateLayer>& schedule) const -> Placement {
 
@@ -308,7 +263,7 @@ auto HeuristicPlacer::makeInitialPlacementStrategy1(
   return result;
 }
 
-auto HeuristicPlacer::makeInitialPlacementStrategy2(
+auto HeuristicPlacer::makeInitialPlacementStrategy3(
     const size_t nQubits,
     const std::vector<TwoQubitGateLayer>& schedule) const -> Placement {
 
@@ -395,6 +350,8 @@ auto HeuristicPlacer::makeInitialPlacement(const size_t nQubits,
       return makeInitialPlacementStrategy1(nQubits, schedule);
   case 2:
       return makeInitialPlacementStrategy2(nQubits, schedule);
+  case 3:
+      return makeInitialPlacementStrategy3(nQubits, schedule);
   default: // trivial
     auto slmIt = architecture_.get().storageZones.cbegin();
     std::size_t c = 0;

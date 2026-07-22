@@ -22,8 +22,9 @@ axes = axes.flatten()
 benchmarks = df["benchmark"].unique()
 strategy_labels = {
     0: "Trivial",
-    1: "Activity / zone affinity",
-    2: "Interaction graph",
+    1: "Geometric",
+    2: "Activity-based",
+    3: "Interaction-based",
 }
 df["Strategy"] = df["strategy_name"].map(strategy_labels)
 fig.suptitle("Routing Time Comparison by Initial Placement Strategy", fontsize=16)
